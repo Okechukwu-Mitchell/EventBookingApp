@@ -31,13 +31,13 @@ ensuring that the tests are independent of the Umbraco runtime environment.
 The project is built on .NET 8, taking advantage of its cross-platform support and performance improvements, 
 and is designed to run within an Umbraco 13 CMS environment with a SQLite or SQL Server database for data persistence.
 
-## Known Limitations
+## Known Limitation
 
 Dependency on Umbraco Services:
 The application relies heavily on Umbraco’s APIs (e.g., IContentService) for event and booking management. 
 This tight coupling means that changes to Umbraco’s API in future versions may require updates to the application code.
 
-## Assumptions
+## Assumption
 
 Umbraco Environment:
 It is assumed that the application will run within a properly configured Umbraco 13 environment 
