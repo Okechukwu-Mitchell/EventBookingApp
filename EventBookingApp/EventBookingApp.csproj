@@ -4,8 +4,28 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="umbraco\**" />
+    <Content Remove="umbraco\**" />
+    <EmbeddedResource Remove="umbraco\**" />
+    <None Remove="umbraco\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="umbraco\models\Event.generated.cs" />
+    <Compile Include="umbraco\models\EventListing.generated.cs" />
+    <Compile Include="umbraco\models\File.generated.cs" />
+    <Compile Include="umbraco\models\Folder.generated.cs" />
+    <Compile Include="umbraco\models\HomePage.generated.cs" />
+    <Compile Include="umbraco\models\Image.generated.cs" />
+    <Compile Include="umbraco\models\Member.generated.cs" />
+    <Compile Include="umbraco\models\UmbracoMediaArticle.generated.cs" />
+    <Compile Include="umbraco\models\UmbracoMediaAudio.generated.cs" />
+    <Compile Include="umbraco\models\UmbracoMediaVectorGraphics.generated.cs" />
+    <Compile Include="umbraco\models\UmbracoMediaVideo.generated.cs" />
+  </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentMigrator" Version="7.1.0" />
     <PackageReference Include="Umbraco.Cms" Version="13.7.2" />
   </ItemGroup>
 
