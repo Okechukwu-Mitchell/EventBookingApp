@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -15,7 +15,6 @@
     <Compile Include="umbraco\models\EventListing.generated.cs" />
     <Compile Include="umbraco\models\File.generated.cs" />
     <Compile Include="umbraco\models\Folder.generated.cs" />
-    <Compile Include="umbraco\models\HomePage.generated.cs" />
     <Compile Include="umbraco\models\Image.generated.cs" />
     <Compile Include="umbraco\models\Member.generated.cs" />
     <Compile Include="umbraco\models\UmbracoMediaArticle.generated.cs" />

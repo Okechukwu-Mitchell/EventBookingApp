@@ -12,7 +12,7 @@ namespace EventBookingApp.Controllers
 {
 	public class BookingSurfaceController : SurfaceController
 	{
-		private readonly IUmbracoDatabaseFactory _databaseFactory;
+		private readonly IPublishedUrlProvider _publishedUrlProvider;
 
 		public BookingSurfaceController(
 			IUmbracoContextAccessor umbracoContextAccessor,
@@ -23,91 +23,73 @@ namespace EventBookingApp.Controllers
 			IPublishedUrlProvider publishedUrlProvider)
 			: base(umbracoContextAccessor, databaseFactory, services, appCaches, profilingLogger, publishedUrlProvider)
 		{
-			_databaseFactory = databaseFactory;
+			_publishedUrlProvider = publishedUrlProvider;
 		}
 
 		[HttpPost]
-		public IActionResult BookEventnow(int eventId, string userEmail, string firstName, string surname, string phoneNumber)
-		{
-			// Validate the event exists
-			var eventNode = UmbracoContext.Content.GetById(eventId);
-			if (eventNode == null)
-			{
-				TempData["Error"] = "Event not found.";
-				return CurrentUmbracoPage();
-			}
-
-			// Check capacity
-			int capacity = eventNode.Value<int>("capacity");
-			using (var db = _databaseFactory.CreateDatabase())
-			{
-				int bookingCount = db.ExecuteScalar<int>("SELECT COUNT(*) FROM Bookings WHERE EventId = @0", eventId);
-				if (bookingCount >= capacity)
-				{
-					TempData["Error"] = "Event is fully booked.";
-					return CurrentUmbracoPage();
-				}
-
-				// Create the booking
-				db.Execute("INSERT INTO Bookings (EventId, BookingDate, Email, FirstName, Surname, PhoneNumber, Status) VALUES (@0, @1, @2, @3, @4, @5, @6)",
-					eventId, DateTime.Now, userEmail, firstName, surname, phoneNumber, "Confirmed");
-			}
-
-			TempData["Success"] = "Booking successful!";
-			return RedirectToCurrentUmbracoPage();
-		}
-
 		public IActionResult BookEvent(int eventId, string userEmail, string firstName, string surname, string phoneNumber)
 		{
-			// Validate the event exists
-			var eventNode = UmbracoContext.Content.GetById(eventId);
+			// Get the event node
+			var eventNode = UmbracoContext.Content?.GetById(eventId);
 			if (eventNode == null)
 			{
 				TempData["Error"] = "Event not found.";
-				return CurrentUmbracoPage();
+				return RedirectToCurrentPage();
 			}
 
 			// Validate email
-			userEmail = userEmail?.Trim();
-			if (string.IsNullOrEmpty(userEmail))
+			if (string.IsNullOrWhiteSpace(userEmail))
 			{
 				TempData["Error"] = "Email is required.";
-				return CurrentUmbracoPage();
-			}
-			if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(userEmail))
-			{
-				TempData["Error"] = "Invalid email address.";
-				return CurrentUmbracoPage();
+				return RedirectToCurrentPage();
 			}
 
-			// Check capacity
-			int capacity = eventNode.Value<int>("capacity");
-			using (var db = _databaseFactory.CreateDatabase())
+			if (!userEmail.Contains("@"))
+			{
+				TempData["Error"] = "Invalid email address.";
+				return RedirectToCurrentPage();
+			}
+
+			// Check event capacity
+			var capacityProperty = eventNode.GetProperty("capacity");
+			int capacity = capacityProperty != null ? (int)capacityProperty.GetValue() : 0;
+			using (var db = DatabaseFactory.CreateDatabase())
 			{
 				int bookingCount = db.ExecuteScalar<int>("SELECT COUNT(*) FROM Bookings WHERE EventId = @0", eventId);
 				if (bookingCount >= capacity)
 				{
 					TempData["Error"] = "Event is fully booked.";
-					return CurrentUmbracoPage();
+					return RedirectToCurrentPage();
 				}
 
-				// Check if the email has already booked this event (case-insensitive)
-				bool emailAlreadyBooked = db.ExecuteScalar<int>(
-					"SELECT COUNT(*) FROM Bookings WHERE EventId = @0 AND LOWER(Email) = LOWER(@1)",
-					eventId, userEmail) > 0;
-				if (emailAlreadyBooked)
+				// Check if email is already used
+				int emailCount = db.ExecuteScalar<int>("SELECT COUNT(*) FROM Bookings WHERE EventId = @0 AND LOWER(Email) = LOWER(@1)", eventId, userEmail);
+				if (emailCount > 0)
 				{
 					TempData["Error"] = "Booking failed. This email has already been used to book this event.";
-					return CurrentUmbracoPage();
+					return RedirectToCurrentPage();
 				}
 
 				// Create the booking
-				db.Execute("INSERT INTO Bookings (EventId, BookingDate, Email, FirstName, Surname, PhoneNumber, Status) VALUES (@0, @1, @2, @3, @4, @5, @6)",
+				db.Execute(
+					"INSERT INTO Bookings (EventId, BookingDate, Email, FirstName, Surname, PhoneNumber, Status) VALUES (@0, @1, @2, @3, @4, @5, @6)",
 					eventId, DateTime.Now, userEmail, firstName, surname, phoneNumber, "Confirmed");
 			}
 
 			TempData["Success"] = "Booking successful!";
-			return RedirectToCurrentUmbracoPage();
+			return RedirectToCurrentPage();
+		}
+
+		private IActionResult RedirectToCurrentPage()
+		{
+			var currentPage = UmbracoContext.PublishedRequest?.PublishedContent;
+			if (currentPage == null)
+			{
+				return Redirect("/"); // Fall back if current page is not available
+			}
+
+			var url = _publishedUrlProvider.GetUrl(currentPage);
+			return LocalRedirect(url);
 		}
 	}
 }

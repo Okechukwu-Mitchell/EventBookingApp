@@ -17,69 +17,94 @@
     bool isFullyBooked = bookingCount >= capacity;
     int remainingSlots = capacity - bookingCount;
 }
+
 <html>
 <head>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <style>
+        /* Minimal custom CSS */
+        body {
+            background-color: #f5f7fa; /* Light gray background */
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .event-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+        }
+    </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <h1>@Model.Name</h1>
-        <p><strong>Date:</strong> @Model.Value("eventDate")</p>
-        <p><strong>Location:</strong> @Model.Value("location")</p>
-        <p><strong>Description:</strong> @Model.Value("description")</p>
-        <p><strong>Capacity:</strong> @Model.Value("capacity")</p>
-        <p><strong>Remaining Slots:</strong> @remainingSlots</p>
-
-        @if (TempData["Success"] != null)
-        {
-            <div class="alert alert-success" id="successMessage" style="width: 50%; margin: auto;">
-                @TempData["Success"]
+    <div class="container mt-5" style="max-width: 900px;">
+        <div class="event-card bg-white p-5">
+            <h1 class="text-center mb-4 fw-bold text-dark">@Model.Name</h1>
+            <div class="text-center mb-4">
+                <table style="margin: 0 auto;">
+                    <tr><td><strong>Date:</strong></td><td>@Model.Value("eventDate")</td></tr>
+                    <tr><td><strong>Location:</strong></td><td>@Model.Value("location")</td></tr>
+                    <tr><td><strong>Description:</strong></td><td>@Model.Value("description")</td></tr>
+                    <tr><td><strong>Capacity:</strong></td><td>@Model.Value("capacity")</td></tr>
+                    <tr><td><strong>Remaining Slots:</strong></td><td>@remainingSlots</td></tr>
+                </table>
             </div>
-        }
-        @if (TempData["Error"] != null)
-        {
-            <div class="alert alert-danger" id="errorMessage" style="width: 50%; margin: auto;">
-                @TempData["Error"]
-            </div>
-        }
 
-        @if (isFullyBooked)
-        {
-            <h2 class="text-center">Event Fully Booked</h2>
-            <p class="alert alert-danger text-center fw-bold">
-                Sorry, this event is at full capacity (@capacity bookings). Stay tuned for future openings!
-            </p>
-        }
-
-        else
-        {
-            <h2>Book This Event</h2>
-            @using (Html.BeginUmbracoForm("BookEvent", "BookingSurface", FormMethod.Post))
+            @if (TempData["Success"] != null)
             {
-                <div class="w-50">
-                    <input type="hidden" name="eventId" value="@Model.Id" />
-                    <div class="mb-3">
-                        <label for="firstName" class="form-label">First Name:</label>
-                        <input type="text" name="firstName" id="firstName" class="form-control" required />
-                    </div>
-                    <div class="mb-3">
-                        <label for="surname" class="form-label">Surname:</label>
-                        <input type="text" name="surname" id="surname" class="form-control" required />
-                    </div>
-                    <div class="mb-3">
-                        <label for="userEmail" class="form-label">Your Email:</label>
-                        <input type="email" name="userEmail" id="userEmail" class="form-control" required />
-                    </div>
-                    <div class="mb-3">
-                        <label for="phoneNumber" class="form-label">Phone Number:</label>
-                        <input type="tel" name="phoneNumber" id="phoneNumber" class="form-control" required pattern="\+?[0-9\s\-\(\)]{7,}" placeholder="Phone number"
-                               title="Enter a valid phone number (e.g., +234-456-7890 or 09034567890)" />
-                    </div>
-                    <button type="submit" class="btn btn-primary mx-auto">Book Now</button>
+                <div class="alert alert-success text-center" id="successMessage">
+                    @TempData["Success"]
                 </div>
             }
-        }
-            
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger text-center" id="errorMessage">
+                    @TempData["Error"]
+                </div>
+            }
+
+            @if (isFullyBooked)
+            {
+                <h2 class="text-center text-danger fw-bold mb-3">Event Fully Booked</h2>
+                <p class="alert alert-danger text-center fw-bold">
+                    Sorry, this event is at full capacity (@capacity bookings). Stay tuned for future openings!
+                </p>
+            }
+            else
+            {
+                <h2 class="text-center mb-4 fw-bold text-dark">Book This Event</h2>
+                @using (Html.BeginUmbracoForm("BookEvent", "BookingSurface", FormMethod.Post))
+                {
+                    <div class="w-75 mx-auto">
+                        <input type="hidden" name="eventId" value="@Model.Id" />
+                        <div class="mb-3">
+                            <label for="firstName" class="form-label text-center d-block">First Name:</label>
+                            <input type="text" name="firstName" id="firstName" class="form-control rounded-3" required />
+                        </div>
+                        <div class="mb-3">
+                            <label for="surname" class="form-label text-center d-block">Surname:</label>
+                            <input type="text" name="surname" id="surname" class="form-control rounded-3" required />
+                        </div>
+                        <div class="mb-3">
+                            <label for="userEmail" class="form-label text-center d-block">Your Email:</label>
+                            <input type="email" name="userEmail" id="userEmail" class="form-control rounded-3" required />
+                        </div>
+                        <div class="mb-3">
+                            <label for="phoneNumber" class="form-label text-center d-block">Phone Number:</label>
+                            <input type="tel" name="phoneNumber" id="phoneNumber" class="form-control rounded-3" required pattern="\+?[0-9\s\-\(\)]{7,}" placeholder="Phone number"
+                                   title="Enter a valid phone number (e.g., +234-456-7890 or 09034567890)" />
+                        </div>
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary rounded-3 px-4">Book Now</button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
     </div>
 
     <script>
@@ -92,83 +117,4 @@
 </body>
 </html>
 
-
-@* @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<Event>
-@{
-    Layout = null;
-}
-<!DOCTYPE html>
-<html>
-<head>
-    <title>@Model.Name</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container mt-5">
-        <h1>@Model.Name</h1>
-        <p><strong>Date:</strong> @Model.Value("eventDate")</p>
-        <p><strong>Location:</strong> @Model.Value("location")</p>
-        <p><strong>Description:</strong> @Model.Value("description")</p>
-        <p><strong>Capacity:</strong> @Model.Value("capacity")</p>
-
-        @if (TempData["Success"] != null)
-        {
-            <p class="text-success">@TempData["Success"]</p>
-        }
-        @if (TempData["Error"] != null)
-        {
-            <p class="text-danger">@TempData["Error"]</p>
-        }
-
-        <h2>Book This Event</h2>
-        @using (Html.BeginUmbracoForm("BookEvent", "BookingSurface", FormMethod.Post))
-        {
-            <input type="hidden" name="eventId" value="@Model.Id" />
-            <div class="mb-3">
-                <label for="userEmail" class="form-label">Your Email:</label>
-                <input type="email" name="userEmail" id="userEmail" class="form-control" required />
-            </div>
-            <button type="submit" class="btn btn-primary">Book Now</button>
-        }
-    </div>
-</body>
-</html> *@
-
-
-
-@* @inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
-@{
-    Layout = null;
-}
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>@Model.Name</title>
-    </head>
-    <body>
-        <h1>@Model.Name</h1>
-        <p><strong>Date:</strong> @Model.Value("eventDate")</p>
-        <p><strong>Location:</strong> @Model.Value("location")</p>
-        <p><strong>Description:</strong> @Model.Value("description")</p>
-        <p><strong>Capacity:</strong> @Model.Value("capacity")</p>
-
-        @if (TempData["Success"] != null)
-        {
-            <p style="color: green;">@TempData["Success"]</p>
-        }
-        @if (TempData["Error"] != null)
-        {
-            <p style="color: red;">@TempData["Error"]</p>
-        }
-
-        <h2>Book This Event</h2>
-        @using (Html.BeginUmbracoForm("BookEvent", "BookingSurface", FormMethod.Post))
-        {
-            <input type="hidden" name="eventId" value="@Model.Id" />
-            <label for="userEmail">Your Email:</label>
-            <input type="email" name="userEmail" id="userEmail" required />
-            <button type="submit">Book Now</button>
-        }
-    </body>
-</html>*@
  
