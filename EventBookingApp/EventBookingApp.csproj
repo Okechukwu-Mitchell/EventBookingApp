@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <PackageReference Include="FluentMigrator" Version="7.1.0" />
+    <PackageReference Include="Microsoft.SqlServer.Management.SqlParser" Version="172.18.0" />
     <PackageReference Include="Umbraco.Cms" Version="13.7.2" />
   </ItemGroup>
 

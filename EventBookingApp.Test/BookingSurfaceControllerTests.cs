@@ -1,19 +1,14 @@
 ﻿
 
 
-using EventBookingApp.Controllers;
+using EventBookingApp.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Moq;
-using Umbraco.Cms.Core.Cache;
-using Umbraco.Cms.Core.Logging;
 using Umbraco.Cms.Core.Models.PublishedContent;
-using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
-using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Web;
-using Umbraco.Cms.Infrastructure.Persistence;
 using Umbraco.Cms.Web.Website.Controllers;
 using Xunit;
 
@@ -21,33 +16,22 @@ namespace EventBookingApp.Tests
 {
 	public class BookingSurfaceControllerTests
 	{
+		private readonly Mock<IBookingService> _bookingServiceMock;
 		private readonly Mock<IUmbracoContextAccessor> _umbracoContextAccessorMock;
 		private readonly Mock<IUmbracoContext> _umbracoContextMock;
-		private readonly Mock<IUmbracoDatabaseFactory> _databaseFactoryMock;
-		private readonly Mock<IUmbracoDatabase> _databaseMock;
-		private readonly Mock<IPublishedContent> _eventNodeMock;
-		private readonly Mock<IPublishedContentCache> _contentCacheMock;
 		private readonly Mock<IPublishedRequest> _publishedRequestMock;
 		private readonly Mock<IPublishedContent> _currentPageMock;
-		private readonly Mock<IProfilingLogger> _profilingLoggerMock;
 		private readonly Mock<IPublishedUrlProvider> _publishedUrlProviderMock;
 		private readonly TempDataDictionary _tempData;
 
-		// Delegate to match the TryGetUmbracoContext signature
-		private delegate void TryGetUmbracoContextDelegate(ref IUmbracoContext context);
-
 		public BookingSurfaceControllerTests()
 		{
-			// Set up mocks for all dependencies
+			// Initialize mocks
+			_bookingServiceMock = new Mock<IBookingService>();
 			_umbracoContextAccessorMock = new Mock<IUmbracoContextAccessor>();
 			_umbracoContextMock = new Mock<IUmbracoContext>();
-			_databaseFactoryMock = new Mock<IUmbracoDatabaseFactory>();
-			_databaseMock = new Mock<IUmbracoDatabase>();
-			_eventNodeMock = new Mock<IPublishedContent>();
-			_contentCacheMock = new Mock<IPublishedContentCache>();
 			_publishedRequestMock = new Mock<IPublishedRequest>();
 			_currentPageMock = new Mock<IPublishedContent>();
-			_profilingLoggerMock = new Mock<IProfilingLogger>();
 			_publishedUrlProviderMock = new Mock<IPublishedUrlProvider>();
 
 			// Set up TempData
@@ -56,197 +40,126 @@ namespace EventBookingApp.Tests
 			tempDataProvider.Setup(x => x.SaveTempData(It.IsAny<HttpContext>(), It.IsAny<IDictionary<string, object>>()));
 			_tempData = new TempDataDictionary(new DefaultHttpContext(), tempDataProvider.Object);
 
-			// Configure UmbracoContextAccessor to return UmbracoContext
+			// Configure UmbracoContextAccessor to return UmbracoContext via out parameter
 			_umbracoContextAccessorMock
 				.Setup(x => x.TryGetUmbracoContext(out It.Ref<IUmbracoContext>.IsAny))
-				.Callback(new TryGetUmbracoContextDelegate((ref IUmbracoContext context) => context = _umbracoContextMock.Object))
-				.Returns(true);
-
-			// Configure UmbracoContext to return ContentCache
-			_umbracoContextMock
-				.Setup(x => x.Content)
-				.Returns(_contentCacheMock.Object);
+				.Returns((out IUmbracoContext context) =>
+				{
+					context = _umbracoContextMock.Object;
+					return true;
+				});
 
 			// Configure UmbracoContext to return PublishedRequest
 			_publishedRequestMock
 				.Setup(x => x.PublishedContent)
 				.Returns(_currentPageMock.Object);
-			_publishedRequestMock
-				.Setup(x => x.Uri)
-				.Returns(new Uri("http://example.com"));
 			_umbracoContextMock
 				.Setup(x => x.PublishedRequest)
 				.Returns(_publishedRequestMock.Object);
 
-			// Configure IPublishedUrlProvider to return a valid URL for the current page
+			// Configure IPublishedUrlProvider to return a valid URL
 			_publishedUrlProviderMock
 				.Setup(x => x.GetUrl(_currentPageMock.Object, It.IsAny<UrlMode>(), It.IsAny<string>(), It.IsAny<Uri>()))
 				.Returns("/current-page");
-
-			// Configure DatabaseFactory to return Database
-			_databaseFactoryMock
-				.Setup(x => x.CreateDatabase())
-				.Returns(_databaseMock.Object);
 		}
 
 		[Fact]
-		public void BookEvent_EventNotFound_ReturnsCurrentUmbracoPageWithError()
+		public void BookEvent_EventNotFound_ReturnsRedirectWithError()
 		{
 			// Arrange
 			int eventId = 123;
-			_contentCacheMock
-				.Setup(x => x.GetById(eventId))
-				.Returns((IPublishedContent)null); // Event not found
+			_bookingServiceMock
+				.Setup(x => x.TryBookEvent(eventId, "test@example.com", "John", "Doe", "1234567890"))
+				.Returns((false, "Event not found."));
 
-			var controller = new BookingSurfaceController(
-				_umbracoContextAccessorMock.Object,
-				_databaseFactoryMock.Object,
-				null, // ServiceContext
-				null, // AppCaches
-				_profilingLoggerMock.Object,
-				_publishedUrlProviderMock.Object)
-			{
-				TempData = _tempData
-			};
+			var controller = CreateController();
 
 			// Act
 			var result = controller.BookEvent(eventId, "test@example.com", "John", "Doe", "1234567890");
 
 			// Assert
-			Assert.IsType<LocalRedirectResult>(result);
+			var redirectResult = Assert.IsType<LocalRedirectResult>(result);
+			Assert.Equal("/current-page", redirectResult.Url);
 			Assert.Equal("Event not found.", _tempData["Error"]?.ToString());
 		}
 
 		[Fact]
-		public void BookEvent_EmptyEmail_ReturnsCurrentUmbracoPageWithError()
+		public void BookEvent_EmptyEmail_ReturnsRedirectWithError()
 		{
 			// Arrange
 			int eventId = 123;
-			_contentCacheMock
-				.Setup(x => x.GetById(eventId))
-				.Returns(_eventNodeMock.Object);
+			_bookingServiceMock
+				.Setup(x => x.TryBookEvent(eventId, "", "John", "Doe", "1234567890"))
+				.Returns((false, "Email is required."));
 
-			var controller = new BookingSurfaceController(
-				_umbracoContextAccessorMock.Object,
-				_databaseFactoryMock.Object,
-				null, // ServiceContext
-				null, // AppCaches
-				_profilingLoggerMock.Object,
-				_publishedUrlProviderMock.Object)
-			{
-				TempData = _tempData
-			};
+			var controller = CreateController();
 
 			// Act
 			var result = controller.BookEvent(eventId, "", "John", "Doe", "1234567890");
 
 			// Assert
-			Assert.IsType<LocalRedirectResult>(result);
+			var redirectResult = Assert.IsType<LocalRedirectResult>(result);
+			Assert.Equal("/current-page", redirectResult.Url);
 			Assert.Equal("Email is required.", _tempData["Error"]?.ToString());
 		}
 
 		[Fact]
-		public void BookEvent_InvalidEmail_ReturnsCurrentUmbracoPageWithError()
+		public void BookEvent_InvalidEmail_ReturnsRedirectWithError()
 		{
 			// Arrange
 			int eventId = 123;
-			_contentCacheMock
-				.Setup(x => x.GetById(eventId))
-				.Returns(_eventNodeMock.Object);
+			_bookingServiceMock
+				.Setup(x => x.TryBookEvent(eventId, "invalid-email", "John", "Doe", "1234567890"))
+				.Returns((false, "Invalid email address."));
 
-			var controller = new BookingSurfaceController(
-				_umbracoContextAccessorMock.Object,
-				_databaseFactoryMock.Object,
-				null, // ServiceContext
-				null, // AppCaches
-				_profilingLoggerMock.Object,
-				_publishedUrlProviderMock.Object)
-			{
-				TempData = _tempData
-			};
+			var controller = CreateController();
 
 			// Act
 			var result = controller.BookEvent(eventId, "invalid-email", "John", "Doe", "1234567890");
 
 			// Assert
-			Assert.IsType<LocalRedirectResult>(result);
+			var redirectResult = Assert.IsType<LocalRedirectResult>(result);
+			Assert.Equal("/current-page", redirectResult.Url);
 			Assert.Equal("Invalid email address.", _tempData["Error"]?.ToString());
 		}
 
 		[Fact]
-		public void BookEvent_EventFullyBooked_ReturnsCurrentUmbracoPageWithError()
+		public void BookEvent_EventFullyBooked_ReturnsRedirectWithError()
 		{
 			// Arrange
 			int eventId = 123;
-			int capacity = 2;
-			var propertyMock = new Mock<IPublishedProperty>();
-			propertyMock.Setup(x => x.GetValue(It.IsAny<string>(), It.IsAny<string>())).Returns(capacity);
-			_contentCacheMock
-				.Setup(x => x.GetById(eventId))
-				.Returns(_eventNodeMock.Object);
-			_eventNodeMock
-				.Setup(x => x.GetProperty("capacity"))
-				.Returns(propertyMock.Object);
-			_databaseMock
-				.Setup(x => x.ExecuteScalar<int>("SELECT COUNT(*) FROM Bookings WHERE EventId = @0", eventId))
-				.Returns(capacity); // Booking count equals capacity
+			_bookingServiceMock
+				.Setup(x => x.TryBookEvent(eventId, "test@example.com", "John", "Doe", "1234567890"))
+				.Returns((false, "Event is fully booked."));
 
-			var controller = new BookingSurfaceController(
-				_umbracoContextAccessorMock.Object,
-				_databaseFactoryMock.Object,
-				null, // ServiceContext
-				null, // AppCaches
-				_profilingLoggerMock.Object,
-				_publishedUrlProviderMock.Object)
-			{
-				TempData = _tempData
-			};
+			var controller = CreateController();
 
 			// Act
 			var result = controller.BookEvent(eventId, "test@example.com", "John", "Doe", "1234567890");
 
 			// Assert
-			Assert.IsType<LocalRedirectResult>(result);
+			var redirectResult = Assert.IsType<LocalRedirectResult>(result);
+			Assert.Equal("/current-page", redirectResult.Url);
 			Assert.Equal("Event is fully booked.", _tempData["Error"]?.ToString());
 		}
 
 		[Fact]
-		public void BookEvent_EmailAlreadyUsed_ReturnsCurrentUmbracoPageWithError()
+		public void BookEvent_EmailAlreadyUsed_ReturnsRedirectWithError()
 		{
 			// Arrange
 			int eventId = 123;
-			int capacity = 2;
-			var propertyMock = new Mock<IPublishedProperty>();
-			propertyMock.Setup(x => x.GetValue(It.IsAny<string>(), It.IsAny<string>())).Returns(capacity);
-			_contentCacheMock
-				.Setup(x => x.GetById(eventId))
-				.Returns(_eventNodeMock.Object);
-			_eventNodeMock
-				.Setup(x => x.GetProperty("capacity"))
-				.Returns(propertyMock.Object);
-			_databaseMock
-				.Setup(x => x.ExecuteScalar<int>("SELECT COUNT(*) FROM Bookings WHERE EventId = @0", eventId))
-				.Returns(1); // Booking count less than capacity
-			_databaseMock
-				.Setup(x => x.ExecuteScalar<int>("SELECT COUNT(*) FROM Bookings WHERE EventId = @0 AND LOWER(Email) = LOWER(@1)", eventId, "test@example.com"))
-				.Returns(1); // Email already used
+			_bookingServiceMock
+				.Setup(x => x.TryBookEvent(eventId, "test@example.com", "John", "Doe", "1234567890"))
+				.Returns((false, "Booking failed. This email has already been used to book this event."));
 
-			var controller = new BookingSurfaceController(
-				_umbracoContextAccessorMock.Object,
-				_databaseFactoryMock.Object,
-				null, // ServiceContext
-				null, // AppCaches
-				_profilingLoggerMock.Object,
-				_publishedUrlProviderMock.Object)
-			{
-				TempData = _tempData
-			};
+			var controller = CreateController();
 
 			// Act
 			var result = controller.BookEvent(eventId, "test@example.com", "John", "Doe", "1234567890");
 
 			// Assert
-			Assert.IsType<LocalRedirectResult>(result);
+			var redirectResult = Assert.IsType<LocalRedirectResult>(result);
+			Assert.Equal("/current-page", redirectResult.Url);
 			Assert.Equal("Booking failed. This email has already been used to book this event.", _tempData["Error"]?.ToString());
 		}
 
@@ -255,45 +168,57 @@ namespace EventBookingApp.Tests
 		{
 			// Arrange
 			int eventId = 123;
-			int capacity = 2;
-			var propertyMock = new Mock<IPublishedProperty>();
-			propertyMock.Setup(x => x.GetValue(It.IsAny<string>(), It.IsAny<string>())).Returns(capacity);
-			_contentCacheMock
-				.Setup(x => x.GetById(eventId))
-				.Returns(_eventNodeMock.Object);
-			_eventNodeMock
-				.Setup(x => x.GetProperty("capacity"))
-				.Returns(propertyMock.Object);
-			_databaseMock
-				.Setup(x => x.ExecuteScalar<int>("SELECT COUNT(*) FROM Bookings WHERE EventId = @0", eventId))
-				.Returns(1); // Booking count less than capacity
-			_databaseMock
-				.Setup(x => x.ExecuteScalar<int>("SELECT COUNT(*) FROM Bookings WHERE EventId = @0 AND LOWER(Email) = LOWER(@1)", eventId, "test@example.com"))
-				.Returns(0); // Email not used
-			_databaseMock
-				.Setup(x => x.Execute(It.IsAny<string>(), It.IsAny<object[]>()))
-				.Returns(1); // Simulate successful insert
+			_bookingServiceMock
+				.Setup(x => x.TryBookEvent(eventId, "test@example.com", "John", "Doe", "1234567890"))
+				.Returns((true, "Booking successful!"));
 
-			var controller = new BookingSurfaceController(
-				_umbracoContextAccessorMock.Object,
-				_databaseFactoryMock.Object,
-				null, // ServiceContext
-				null, // AppCaches
-				_profilingLoggerMock.Object,
-				_publishedUrlProviderMock.Object)
-			{
-				TempData = _tempData
-			};
+			var controller = CreateController();
 
 			// Act
 			var result = controller.BookEvent(eventId, "test@example.com", "John", "Doe", "1234567890");
 
 			// Assert
-			Assert.IsType<LocalRedirectResult>(result);
+			var redirectResult = Assert.IsType<LocalRedirectResult>(result);
+			Assert.Equal("/current-page", redirectResult.Url);
 			Assert.Equal("Booking successful!", _tempData["Success"]?.ToString());
-			_databaseMock.Verify(x => x.Execute(
-				"INSERT INTO Bookings (EventId, BookingDate, Email, FirstName, Surname, PhoneNumber, Status) VALUES (@0, @1, @2, @3, @4, @5, @6)",
-				It.IsAny<object[]>()), Times.Once());
+		}
+		[Fact]
+		public void BookEvent_NoPublishedRequest_ReturnsFallbackRedirect()
+		{
+			// Arrange
+			int eventId = 123;
+			_bookingServiceMock
+				.Setup(x => x.TryBookEvent(eventId, "test@example.com", "John", "Doe", "1234567890"))
+				.Returns((true, "Booking successful!"));
+
+			// Simulate PublishedRequest being null
+			_umbracoContextMock
+				.Setup(x => x.PublishedRequest)
+				.Returns((IPublishedRequest)null);
+
+			var controller = CreateController();
+
+			// Act
+			var result = controller.BookEvent(eventId, "test@example.com", "John", "Doe", "1234567890");
+
+			// Assert
+			var redirectResult = Assert.IsType<RedirectResult>(result);
+			Assert.Equal("/", redirectResult.Url);
+			Assert.Equal("Booking successful!", _tempData["Success"]?.ToString());
+		}
+		private BookingSurfaceController CreateController()
+		{
+			return new BookingSurfaceController(
+				_bookingServiceMock.Object,
+				_umbracoContextAccessorMock.Object,
+				null, // IUmbracoDatabaseFactory
+				null, // ServiceContext
+				null, // AppCaches
+				null, // IProfilingLogger
+				_publishedUrlProviderMock.Object)
+			{
+				TempData = _tempData
+			};
 		}
 	}
 }
